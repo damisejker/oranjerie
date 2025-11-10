@@ -1782,12 +1782,6 @@ echo "<p>У вас пока нет семян в депозитарии. Отп�
 .tooltip:hover .tooltiptext {
   visibility: visible;
 }
-
-.pot {
-  width: 18%;
-  position: absolute;
-  cursor: grab;
-}
 </style>
 
 <div class="room">
