@@ -1088,7 +1088,7 @@ $stmtCheckPotsCount->close();
 
 // Если горшков меньше 6, показываем кнопку добавления
 if ($userPotCount < 6) {
-    echo '<br><a href="?add_pot=yes" id="myBtn"><img src="https://cdn-icons-png.flaticon.com/512/1827/1827951.png" height="55" title="Добавить горшок (у вас ' . $userPotCount . ' из 6)"></a>';
+    echo '<br><a href="?add_pot=yes" id="myBtn"><img src="images/add_pot.png" height="55" title="Добавить горшок (у вас ' . $userPotCount . ' из 6)"></a>';
 }
 // [MULTIPOT END]
 
@@ -1783,11 +1783,6 @@ echo "<p>У вас пока нет семян в депозитарии. Отп�
   visibility: visible;
 }
 
-.pot {
-  width: 18%;
-  position: absolute;
-  cursor: grab;
-}
 </style>
 
 <div class="room">
