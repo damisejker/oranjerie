@@ -44,8 +44,8 @@ html {
 
 
 .pot {
-  width: 18vw;
-  height: 18%;
+  width: 10vw;
+  height: 10vw;
   background-image: url('https://magismo.ru/greenhouse/images/pot.png');
   background-repeat: no-repeat;
   background-size: contain;
@@ -55,7 +55,6 @@ html {
   margin: 0;
   display: inline-block;
   visibility: visible;
-  aspect-ratio: 1 / 1.05;
 }
 
 
