@@ -1,0 +1,252 @@
+@font-face {
+font-family: Original;
+src: url('https://magismo.ru/castle_style/fonts/Original.otf');
+}
+
+@font-face {
+font-family: Magismo;
+src: url('https://magismo.ru/castle_style/fonts/Magismos.ttf');
+}
+
+@font-face {
+font-family: Oranjerie;
+src: url('https://magismo.ru/greenhouse/fonts/oranjeria.ttf');
+}
+
+.customfont { font-family: Original;}
+.magismo { font-family: Magismo; font-size:14px;}
+.oranjerie { font-family: Oranjerie; font-size:14px;}
+
+html { 
+  background: url('https://magismo.ru/greenhouse/images/greenhouse.jpg') no-repeat center center fixed; 
+  -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+  font-family:Magismo;
+}
+
+.room {
+    height:48%;
+    background-image: url('https://magismo.ru/greenhouse/images/rotkavel.png');
+    background-repeat:no-repeat;
+    background-size: contain;
+    background-position:center center;
+    position: fixed;
+    top:55%;
+    bottom: 0px;
+    left: 0;
+    right: 0;
+    margin: 0;
+    display: inline-block;
+    visibility: visible;
+}
+
+
+.pot {
+  height: 18%;
+  background-image: url('https://magismo.ru/greenhouse/images/pot.png');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center center;
+  position: fixed;
+  transform: translate(-50%, -50%); /* Center the pot */
+  margin: 0;
+  display: inline-block;
+  visibility: visible;
+  aspect-ratio: 1 / 1.05;
+}
+
+
+@keyframes float {
+	0% {
+		box-shadow: 0 0px 0px 0px rgba(0,0,0,0.6);
+		transform: translatey(0px);
+	}
+	50% {
+		box-shadow: 0 0px 0px 0px rgba(0,0,0,0.2);
+		transform: translatey(-20px);
+	}
+	100% {
+		box-shadow: 0 0px 0px 0px rgba(0,0,0,0.6);
+		transform: translatey(0px);
+	}
+}
+.noauth {
+    padding:1px;
+    width:610px;
+    height:auto;
+    position:relative;
+    border-radius:10px;
+    overflow:hidden;
+    color: white;
+    text-align:center;
+    background-image: linear-gradient(rgba(204, 204, 204,0.5), rgba(204, 204, 204,0.5));
+}
+
+.content {
+    padding:1px;
+    width:610px;
+    height:auto;
+    position:relative;
+    background-image: linear-gradient(rgba(204, 204, 204,0.5), rgba(204, 204, 204,0.5));
+    overflow:hidden;
+    color: white;
+}
+
+input[type=text], input[type=password] {
+  width: 28%;
+  padding: 12px 20px;
+  margin: 8px 0;
+  background-color:inherit;
+  box-sizing: border-box;
+  border: none;
+  border-bottom: 2px solid #5c462c;
+}
+
+
+
+select {
+  width: auto;
+  padding: 16px 20px;
+  border: none;
+  border-radius: 4px;
+  background-color: #f1f1f1;
+}
+
+
+.wrap {
+  position: absolute;
+  width: 100px;
+  height: 200px;
+  left: 50%;
+  margin-left: -50px;
+  top: 50%;
+  margin-top: -100px;
+}
+
+.drop {
+  width: 40px;
+  height: 40px;
+  left: 50%;
+  margin-left: -20px;
+  position: absolute;
+  animation: drop 2s cubic-bezier(0.55, 0.085, 0.68, 0.53) 0s infinite;
+}
+
+.drop circle {
+  fill: #2a96ed;
+}
+
+.drop-outer {
+  position: absolute;
+  box-sizing: border-box;
+  /* border: 1px solid #333; */
+  width: 100px;
+  height: 200px;
+  overflow: hidden;
+  border-bottom-right-radius: 50px;
+  border-bottom-left-radius: 50px;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  background-clip: padding-box;
+  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
+}
+
+.ripple {
+  position: absolute;
+  box-sizing: border-box;
+  width: 240px;
+  height: 240px;
+  top: 68px;
+  left: -70px;
+  perspective: 100;
+  transform: rotateX(65deg);
+}
+
+.ripple .ripple-svg {
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  opacity: 0;
+}
+
+.ripple .ripple-svg circle {
+   fill: none;
+   stroke: #2a96ed;
+   stroke-width: 10px;
+   stroke-alignment: inner;
+}
+
+.ripple-1 {
+  animation: ripple 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0s infinite;
+}
+
+.ripple-1 .ripple-svg {
+  animation: fade-in-out 2s linear 0s infinite;
+}
+
+.ripple-1 .ripple-svg circle {
+  animation: border 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0s infinite;
+}
+
+.ripple-2 {
+  animation: ripple 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s infinite;
+}
+
+.ripple-2 .ripple-svg {
+  animation: fade-in-out 2s linear 0.2s infinite;
+}
+
+.ripple-2 .ripple-svg circle {
+  animation: border 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s infinite;
+}
+
+.ripple-3 {
+  animation: ripple 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.35s infinite;
+}
+
+.ripple-3 .ripple-svg {
+  animation: fade-in-out 2s linear 0.35s infinite;
+}
+
+.ripple-3 .ripple-svg circle {
+  animation: border 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.35s infinite;
+}
+
+
+
+@keyframes drop {
+  0% {
+    transform: scale3d(0.01,0.01,0.01) translateY(0)
+  }
+  10% {
+    transform: scale3d(1,1,1) 
+  }
+  44% {
+    transform: scale3d(1,1,1) translateY(200px)
+  }
+  100% {
+    transform: scale3d(1,1,1) translateY(200px)
+  }
+}
+
+@keyframes fade-in-out {
+  0% {opacity: 0}
+  42% {opacity: 0}
+  52% {opacity: 1}
+  65% {opacity: 1}
+  100% {opacity: 0}
+}
+
+@keyframes ripple {
+  0% { transform: rotateX(65deg) scale3d(0.2, 0.2, 0.2) }
+  42% { transform: rotateX(65deg) scale3d(0.2, 0.2, 0.2) }
+  100% { transform: rotateX(65deg) scale3d(0.9, 0.9, 0.9) }
+}
+
+@keyframes border {
+  0% { stroke-width: 6px }
+  42% { stroke-width: 6px }
+  100% {stroke-width: 2px }
+}
