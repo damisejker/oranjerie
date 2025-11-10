@@ -1532,36 +1532,7 @@ if ($row = $result->fetch_assoc()) {
     $potTop = '72%';
 }    
      
-  ?>  
-
-<style>
-.tooltip {
-  position: relative;
-  display: inline-block;
-  border-bottom: 1px dotted black;
-}
-
-.tooltip .tooltiptext {
-  visibility: hidden;
-  width: 120px;
-  background-color: black;
-  color: #fff;
-  text-align: center;
-  border-radius: 6px;
-  padding: 5px 0;
-
-  /* Position the tooltip */
-  position: absolute;
-  z-index: 1;
-}
-
-.tooltip:hover .tooltiptext {
-  visibility: visible;
-}
- .pot {
- width: 18%;
- }
-</style>
+  ?>
 
 <div class="tooltip">
     <div class="pot" style="left: <?php echo $potLeft; ?>; top: <?php echo $potTop; ?>;"> 
