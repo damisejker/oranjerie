@@ -1,0 +1,25 @@
+localhost/magismo_school/oranjerie/		https://176.118.167.211:8888/phpmyadmin/index.php?route=/table/sql&db=magismo_school&table=oranjerie
+SQL-запрос успешно выполнен.
+
+DESCRIBE oranjerie;
+
+
+
+id	int	NO	PRI	NULL	auto_increment	
+login	varchar(255)	NO	MUL	NULL		
+pot_id	int	NO		1		
+plant	varchar(255)	NO		NULL		
+health	int	NO		NULL		
+datehealthchanged	date	NO		NULL		
+water	int	NO		NULL		
+dateplanted	date	NO		NULL		
+datewatered	date	NO		NULL		
+dateshuffled	date	NO		NULL		
+datesprayed	date	NO		NULL		
+waterhunger	date	NO		NULL		
+totalstages	int	NO		NULL		
+stagenumber	int	NO		NULL		
+stagedatechange	date	NO		NULL		
+plantstatus	int	NO		NULL		
+daterotten	date	NO		NULL		
+resistance	int	NO		NULL		

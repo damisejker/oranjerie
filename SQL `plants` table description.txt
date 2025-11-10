@@ -1,0 +1,44 @@
+localhost/magismo_school/oranjerie/		https://176.118.167.211:8888/phpmyadmin/index.php?route=/table/sql&db=magismo_school&table=oranjerie
+SQL-запрос успешно выполнен.
+
+DESCRIBE plants;
+
+
+
+id	int	NO	PRI	NULL	auto_increment	
+name	varchar(255)	NO		NULL		
+stage1	varchar(255)	NO		NULL		
+stage1_size	int	NO		NULL		
+stage1_duration	int	NO		NULL		
+stage1_right	varchar(255)	NO		NULL		
+stage2	varchar(255)	NO		NULL		
+stage2_size	int	NO		NULL		
+stage2_duration	int	NO		NULL		
+stage2_right	varchar(255)	NO		NULL		
+stage2_sickheight	int	NO		NULL		
+stage3	varchar(255)	NO		NULL		
+stage3_size	int	NO		NULL		
+stage3_duration	int	NO		NULL		
+stage3_right	varchar(255)	NO		NULL		
+stage3_sickheight	int	NO		NULL		
+stage4	varchar(255)	NO		NULL		
+stage4_size	int	NO		NULL		
+stage4_duration	int	NO		NULL		
+stage4_right	varchar(255)	NO		NULL		
+stage4_sickheight	int	NO		NULL		
+stage5	varchar(255)	NO		NULL		
+stage5_size	int	NO		NULL		
+stage5_duration	int	NO		NULL		
+stage5_right	varchar(255)	NO		NULL		
+stage5_sickheight	int	NO		NULL		
+stage6	varchar(255)	NO		NULL		
+stage6_size	int	NO		NULL		
+stage6_duration	int	NO		NULL		
+stage6_right	varchar(255)	NO		NULL		
+stage6_sickheight	int	NO		NULL		
+stage1_bottom	int	NO		NULL		
+stage2_bottom	int	NO		NULL		
+stage3_bottom	int	NO		NULL		
+stage4_bottom	int	NO		NULL		
+stage5_bottom	int	NO		NULL		
+stage6_bottom	int	NO		NULL		
