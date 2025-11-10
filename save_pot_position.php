@@ -32,38 +32,56 @@ if ($conn->connect_error) {
 
 /////////////////////////////////
 
+// [MULTIPOT START] Обновленная логика сохранения позиции с поддержкой pot_id
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // It's good practice to check if the expected POST variables are set
-    if (isset($_POST['username'], $_POST['left'], $_POST['top'])) {
+    // Проверяем, что все необходимые параметры переданы
+    if (isset($_POST['pot_id'], $_POST['left'], $_POST['top'], $_POST['username'])) {
+        $potId = intval($_POST['pot_id']);
         $username = $_POST['username'];
         $left = $_POST['left'];
         $top = $_POST['top'];
 
-        // Prepare SQL statement to avoid SQL injection
-        $sql = "INSERT INTO pot_positions (username, pot_left, pot_top) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE pot_left = VALUES(pot_left), pot_top = VALUES(pot_top)";
+        // Проверяем, что горшок принадлежит этому пользователю
+        $sqlCheck = "SELECT `id` FROM `pots` WHERE `id` = ? AND `login` = ?";
+        $stmtCheck = $conn->prepare($sqlCheck);
 
-        $stmt = $conn->prepare($sql);
-        
-        // Check if the statement was prepared successfully
-        if ($stmt === false) {
-            die("Error preparing the statement: " . $conn->error);
+        if ($stmtCheck === false) {
+            die("Error preparing check statement: " . $conn->error);
         }
 
-        $stmt->bind_param("sss", $username, $left, $top);
-        
-        if ($stmt->execute()) {
-            echo "Position saved successfully.";
+        $stmtCheck->bind_param("is", $potId, $username);
+        $stmtCheck->execute();
+        $resultCheck = $stmtCheck->get_result();
+
+        if ($resultCheck->num_rows > 0) {
+            // Горшок принадлежит пользователю, обновляем позицию
+            $sqlUpdate = "UPDATE `pots` SET `pot_left` = ?, `pot_top` = ? WHERE `id` = ? AND `login` = ?";
+            $stmtUpdate = $conn->prepare($sqlUpdate);
+
+            if ($stmtUpdate === false) {
+                die("Error preparing update statement: " . $conn->error);
+            }
+
+            $stmtUpdate->bind_param("ssis", $left, $top, $potId, $username);
+
+            if ($stmtUpdate->execute()) {
+                echo "Position saved successfully for pot ID: " . $potId;
+            } else {
+                echo "Error executing update: " . $stmtUpdate->error;
+            }
+
+            $stmtUpdate->close();
         } else {
-            echo "Error executing the statement: " . $stmt->error;
+            echo "Error: Pot does not belong to this user or does not exist.";
         }
-        
-        $stmt->close();
+
+        $stmtCheck->close();
     } else {
         echo "Required parameters are missing.";
     }
 } else {
-    // If not a POST request
     echo "Invalid request method.";
 }
+// [MULTIPOT END]
 ?>
 
