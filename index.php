@@ -609,13 +609,75 @@ if (empty($_SESSION['login'])) {
     
 <?php
 } else {
-    
+
     if(isset($_SESSION['login'])) {
-    
- 
-    
-      
-?>  
+
+// [MULTIPOT START] Автосоздание дефолтного горшка при первом входе
+// Проверяем, есть ли у пользователя хотя бы один горшок
+$sqlCheckPots = "SELECT COUNT(*) as pot_count FROM `pots` WHERE `login` = ?";
+$stmtCheckPots = $conn->prepare($sqlCheckPots);
+$stmtCheckPots->bind_param("s", $names);
+$stmtCheckPots->execute();
+$resultCheckPots = $stmtCheckPots->get_result();
+$rowCheckPots = $resultCheckPots->fetch_assoc();
+
+// Если у пользователя нет горшков, создаём дефолтный
+if ($rowCheckPots['pot_count'] == 0) {
+    $sqlCreateDefaultPot = "INSERT INTO `pots` (`login`, `name`, `pot_left`, `pot_top`) VALUES (?, 'Горшок', '50%', '80%')";
+    $stmtCreateDefaultPot = $conn->prepare($sqlCreateDefaultPot);
+    $stmtCreateDefaultPot->bind_param("s", $names);
+    $stmtCreateDefaultPot->execute();
+    $stmtCreateDefaultPot->close();
+}
+$stmtCheckPots->close();
+
+// Привязываем старые растения без pot_id к дефолтному горшку
+$sqlLinkOldPlants = "UPDATE `oranjerie` o
+    INNER JOIN `pots` p ON o.`login` = p.`login`
+    SET o.`pot_id` = p.`id`
+    WHERE o.`pot_id` IS NULL
+    AND o.`login` = ?
+    AND p.`id` = (SELECT MIN(`id`) FROM `pots` WHERE `login` = ?)";
+$stmtLinkOldPlants = $conn->prepare($sqlLinkOldPlants);
+$stmtLinkOldPlants->bind_param("ss", $names, $names);
+$stmtLinkOldPlants->execute();
+$stmtLinkOldPlants->close();
+// [MULTIPOT END]
+
+// [MULTIPOT START] Обработчик добавления нового горшка
+if (isset($_GET['add_pot']) && $_GET['add_pot'] == 'yes') {
+    // Проверяем, сколько горшков уже есть у пользователя
+    $sqlCountPots = "SELECT COUNT(*) as pot_count FROM `pots` WHERE `login` = ?";
+    $stmtCountPots = $conn->prepare($sqlCountPots);
+    $stmtCountPots->bind_param("s", $names);
+    $stmtCountPots->execute();
+    $resultCountPots = $stmtCountPots->get_result();
+    $rowCountPots = $resultCountPots->fetch_assoc();
+    $currentPotCount = $rowCountPots['pot_count'];
+    $stmtCountPots->close();
+
+    // Если горшков меньше 6, добавляем новый
+    if ($currentPotCount < 6) {
+        // Вычисляем позицию для нового горшка (смещаем вправо от центра)
+        $offsetLeft = 10 + ($currentPotCount * 15); // каждый следующий горшок сдвигается на 15% вправо
+        $newPotLeft = $offsetLeft . '%';
+        $newPotTop = '80%';
+        $newPotName = 'Горшок ' . ($currentPotCount + 1);
+
+        $sqlAddPot = "INSERT INTO `pots` (`login`, `name`, `pot_left`, `pot_top`) VALUES (?, ?, ?, ?)";
+        $stmtAddPot = $conn->prepare($sqlAddPot);
+        $stmtAddPot->bind_param("ssss", $names, $newPotName, $newPotLeft, $newPotTop);
+        $stmtAddPot->execute();
+        $stmtAddPot->close();
+
+        // Редирект для обновления страницы
+        header("Location: index.php");
+        exit();
+    }
+}
+// [MULTIPOT END]
+
+?>
 
 <div style="font-size:50px;color:#d1a11b;top: 0;left: 0;" align="left">
 
@@ -666,20 +728,41 @@ $date = date("Y-m-d", time());
         $water = "";
     }
 
+// [MULTIPOT START] Обработчик полива с поддержкой pot_id
 if (isset($_GET['water']) && $_GET['water'] == "plant") {
+    // Получаем pot_id из GET или используем дефолтный горшок
+    $potId = isset($_GET['pot_id']) ? intval($_GET['pot_id']) : null;
 
-// полив
-		   $water = "UPDATE `oranjerie` SET `water` = '100', `datewatered`='$date' $water WHERE `login`='$names'";
-				mysqli_query($conn, $water);
-				echo "<script>alert('Растение полито!');</script>";
-				echo "<script language='javascript' type='text/javascript'>
+    if ($potId === null) {
+        // Используем дефолтный горшок (первый по id)
+        $sqlDefaultPot = "SELECT `id` FROM `pots` WHERE `login` = ? ORDER BY `id` LIMIT 1";
+        $stmtDefaultPot = $conn->prepare($sqlDefaultPot);
+        $stmtDefaultPot->bind_param("s", $names);
+        $stmtDefaultPot->execute();
+        $resultDefaultPot = $stmtDefaultPot->get_result();
+        if ($rowDefaultPot = $resultDefaultPot->fetch_assoc()) {
+            $potId = $rowDefaultPot['id'];
+        }
+        $stmtDefaultPot->close();
+    }
+
+    // полив
+    $sqlWater = "UPDATE `oranjerie` SET `water` = '100', `datewatered`='$date' $water WHERE `login`=? AND `pot_id`=?";
+    $stmtWater = $conn->prepare($sqlWater);
+    $stmtWater->bind_param("si", $names, $potId);
+    $stmtWater->execute();
+    $stmtWater->close();
+
+    echo "<script>alert('Растение полито!');</script>";
+    echo "<script language='javascript' type='text/javascript'>
     window.onLoad=poscrolim();
-    
+
     function poscrolim(){
         location.href='index.php';
     }
 </script>";
 }
+// [MULTIPOT END]
 
 
 //* Проверяем нет ли у нас функции поливки *//
@@ -720,24 +803,43 @@ if (isset($_GET['water']) && $_GET['water'] == "plant") {
 	//* Проверяем нет ли у нас функции поливки *//
 	
 	
-	/// spraying things
+// [MULTIPOT START] Обработчик опрыскивания с поддержкой pot_id
     if (isset($_GET['spray']) && $_GET['spray'] == "plant") {
-// опрыскивание
-		   $oprisk = "UPDATE `oranjerie` SET `datesprayed`='$date', `plantstatus`='1' $spray WHERE `login`='$names'";
-				mysqli_query($conn, $oprisk);
-				
-			$depo = "UPDATE `depositarium` SET `raz`=raz-'1' WHERE `tid`='2000' and `login`='$names'";
-				mysqli_query($conn, $depo);	
-				
-				echo "<script>alert('Растение опрыскано!');</script>";
-				echo "<script language='javascript' type='text/javascript'>
+        // Получаем pot_id из GET или используем дефолтный горшок
+        $potIdSpray = isset($_GET['pot_id']) ? intval($_GET['pot_id']) : null;
+
+        if ($potIdSpray === null) {
+            $sqlDefaultPot = "SELECT `id` FROM `pots` WHERE `login` = ? ORDER BY `id` LIMIT 1";
+            $stmtDefaultPot = $conn->prepare($sqlDefaultPot);
+            $stmtDefaultPot->bind_param("s", $names);
+            $stmtDefaultPot->execute();
+            $resultDefaultPot = $stmtDefaultPot->get_result();
+            if ($rowDefaultPot = $resultDefaultPot->fetch_assoc()) {
+                $potIdSpray = $rowDefaultPot['id'];
+            }
+            $stmtDefaultPot->close();
+        }
+
+        // опрыскивание
+        $sqlSpray = "UPDATE `oranjerie` SET `datesprayed`='$date', `plantstatus`='1' $spray WHERE `login`=? AND `pot_id`=?";
+        $stmtSpray = $conn->prepare($sqlSpray);
+        $stmtSpray->bind_param("si", $names, $potIdSpray);
+        $stmtSpray->execute();
+        $stmtSpray->close();
+
+        $depo = "UPDATE `depositarium` SET `raz`=raz-'1' WHERE `tid`='2000' and `login`='$names'";
+        mysqli_query($conn, $depo);
+
+        echo "<script>alert('Растение опрыскано!');</script>";
+        echo "<script language='javascript' type='text/javascript'>
     window.onLoad=poscrolim();
-    
+
     function poscrolim(){
         location.href='index.php';
     }
 </script>";
 }
+// [MULTIPOT END]
 	
 	
 	//* Проверяем нет ли у нас функции опрыскивания растений *//
@@ -785,28 +887,46 @@ if (isset($_GET['water']) && $_GET['water'] == "plant") {
 	
 	
 	
-		/// fertilizing things
+// [MULTIPOT START] Обработчик удобрения с поддержкой pot_id
     if (isset($_GET['fertilize']) && $_GET['fertilize'] == "plant") {
-        
-// опрыскивание
-		   $oprisk = "UPDATE `oranjerie` SET `resistance`=resistance+'5', `health`='100' WHERE `login`='$names'";
-				mysqli_query($conn, $oprisk);
-				
-			$depo = "UPDATE `depositarium` SET `used`='1' WHERE `tid`='418' and `login`='$names'";
-				mysqli_query($conn, $depo);	
-				
-			$thirdtur = "INSERT INTO `thirdtur` SET `name`='$names', `item` = 'Удобрение', `timefound`='".time()."', `turnir`='2', `otkuda`='$pl_stage'";
-				mysqli_query($conn, $thirdtur);	
-				
-				echo "<script>alert('Растение удобрено! Теперь растение устойчиво к паразитам в 5 раз!');</script>";
-				echo "<script language='javascript' type='text/javascript'>
+        // Получаем pot_id из GET или используем дефолтный горшок
+        $potIdFertilize = isset($_GET['pot_id']) ? intval($_GET['pot_id']) : null;
+
+        if ($potIdFertilize === null) {
+            $sqlDefaultPot = "SELECT `id` FROM `pots` WHERE `login` = ? ORDER BY `id` LIMIT 1";
+            $stmtDefaultPot = $conn->prepare($sqlDefaultPot);
+            $stmtDefaultPot->bind_param("s", $names);
+            $stmtDefaultPot->execute();
+            $resultDefaultPot = $stmtDefaultPot->get_result();
+            if ($rowDefaultPot = $resultDefaultPot->fetch_assoc()) {
+                $potIdFertilize = $rowDefaultPot['id'];
+            }
+            $stmtDefaultPot->close();
+        }
+
+        // удобрение
+        $sqlFertilize = "UPDATE `oranjerie` SET `resistance`=resistance+'5', `health`='100' WHERE `login`=? AND `pot_id`=?";
+        $stmtFertilize = $conn->prepare($sqlFertilize);
+        $stmtFertilize->bind_param("si", $names, $potIdFertilize);
+        $stmtFertilize->execute();
+        $stmtFertilize->close();
+
+        $depo = "UPDATE `depositarium` SET `used`='1' WHERE `tid`='418' and `login`='$names'";
+        mysqli_query($conn, $depo);
+
+        $thirdtur = "INSERT INTO `thirdtur` SET `name`='$names', `item` = 'Удобрение', `timefound`='".time()."', `turnir`='2', `otkuda`='$pl_stage'";
+        mysqli_query($conn, $thirdtur);
+
+        echo "<script>alert('Растение удобрено! Теперь растение устойчиво к паразитам в 5 раз!');</script>";
+        echo "<script language='javascript' type='text/javascript'>
     window.onLoad=poscrolim();
-    
+
     function poscrolim(){
         location.href='index.php';
     }
 </script>";
 }
+// [MULTIPOT END]
 	
 		//* Проверяем нет ли у нас функции удобрения растений *//
 	$sql = "SELECT * FROM `depositarium` WHERE `login`='$names' and `tid`='418' and `used` != '1'";
@@ -838,22 +958,41 @@ if (isset($_GET['water']) && $_GET['water'] == "plant") {
 	
 	
 	
-	/* Если цветок сгнил, предлагаем опорожнить горшок */
+// [MULTIPOT START] Обработчик удаления погибшего растения с поддержкой pot_id
         if (isset($_GET['plant']) && $_GET['plant'] == "dispose") {
-            
+            // Получаем pot_id из GET или используем дефолтный горшок
+            $potIdDispose = isset($_GET['pot_id']) ? intval($_GET['pot_id']) : null;
+
+            if ($potIdDispose === null) {
+                $sqlDefaultPot = "SELECT `id` FROM `pots` WHERE `login` = ? ORDER BY `id` LIMIT 1";
+                $stmtDefaultPot = $conn->prepare($sqlDefaultPot);
+                $stmtDefaultPot->bind_param("s", $names);
+                $stmtDefaultPot->execute();
+                $resultDefaultPot = $stmtDefaultPot->get_result();
+                if ($rowDefaultPot = $resultDefaultPot->fetch_assoc()) {
+                    $potIdDispose = $rowDefaultPot['id'];
+                }
+                $stmtDefaultPot->close();
+            }
+
            // функция порожнения горшка
-		   $water = "DELETE FROM `oranjerie`  WHERE `login`='$names'";
-				mysqli_query($conn, $water);
-				echo "<script>alert('Погибшее растение высажено! Горшок пуст. Вы можете посадить следующее семя.');</script>";
-			    echo "<script language='javascript' type='text/javascript'>
+           $sqlDispose = "DELETE FROM `oranjerie` WHERE `login`=? AND `pot_id`=?";
+           $stmtDispose = $conn->prepare($sqlDispose);
+           $stmtDispose->bind_param("si", $names, $potIdDispose);
+           $stmtDispose->execute();
+           $stmtDispose->close();
+
+            echo "<script>alert('Погибшее растение высажено! Горшок пуст. Вы можете посадить следующее семя.');</script>";
+            echo "<script language='javascript' type='text/javascript'>
     window.onLoad=poscrolim();
-    
+
     function poscrolim(){
         location.href='index.php';
     }
 </script>";
-			
-}   
+
+}
+// [MULTIPOT END]   
 	        
 	        if($plantst == 1) { } 
 	        elseif($plantst == 2) {
@@ -883,28 +1022,47 @@ if($pl_stage == $pl_total) {
   
     
 
-    /* Если цветок зацвёл, предлагаем опорожнить горшок */
+// [MULTIPOT START] Обработчик сбора урожая с поддержкой pot_id
 	     if(isset($_GET['plant']) && $_GET['plant'] == "out") {
-	         
+	         // Получаем pot_id из GET или используем дефолтный горшок
+	         $potIdOut = isset($_GET['pot_id']) ? intval($_GET['pot_id']) : null;
+
+	         if ($potIdOut === null) {
+	             $sqlDefaultPot = "SELECT `id` FROM `pots` WHERE `login` = ? ORDER BY `id` LIMIT 1";
+	             $stmtDefaultPot = $conn->prepare($sqlDefaultPot);
+	             $stmtDefaultPot->bind_param("s", $names);
+	             $stmtDefaultPot->execute();
+	             $resultDefaultPot = $stmtDefaultPot->get_result();
+	             if ($rowDefaultPot = $resultDefaultPot->fetch_assoc()) {
+	                 $potIdOut = $rowDefaultPot['id'];
+	             }
+	             $stmtDefaultPot->close();
+	         }
+
 	         $dateadd = date("Y-m-d", time());
-	         
+
 	     // функция добавления растения в депозитарий
 		   $horlaer = "INSERT INTO `depositarium` SET `login`='$names', `date_add` = '$dateadd', `goodname`='$pl_name', `shop`='greenhouse', `picture`='$imagelink', `category`='plants'";
-				mysqli_query($conn, $horlaer);     
+				mysqli_query($conn, $horlaer);
 
            // функция порожнения горшка
-	   $out = "DELETE FROM `oranjerie`  WHERE `login`='$names'";
-				mysqli_query($conn, $out);
+	   $sqlOut = "DELETE FROM `oranjerie` WHERE `login`=? AND `pot_id`=?";
+	   $stmtOut = $conn->prepare($sqlOut);
+	   $stmtOut->bind_param("si", $names, $potIdOut);
+	   $stmtOut->execute();
+	   $stmtOut->close();
+
 				echo "<script>alert('Поздравляем! Вы собираете урожай. Растение убрано и помещено в ваш депозитарий! Горшок пуст. Вы можете посадить следующее семя.');</script>";
 			    echo "<script language='javascript' type='text/javascript'>
     window.onLoad=poscrolim();
-    
+
     function poscrolim(){
         location.href='index.php';
     }
 </script>";
-			
+
 }
+// [MULTIPOT END]
     
    echo "<br><a href='?plant=out' id='myBtn'><img src='https://magismo.ru/greenhouse/images/4284772.png' height='55' title='Собрать урожай'></a>";
    
@@ -913,9 +1071,26 @@ if($pl_stage == $pl_total) {
     echo "";
 }
 	    
-	    
-	    
+
+
 	}
+
+// [MULTIPOT START] Кнопка добавления нового горшка
+// Проверяем количество горшков у пользователя
+$sqlCheckPotsCount = "SELECT COUNT(*) as pot_count FROM `pots` WHERE `login` = ?";
+$stmtCheckPotsCount = $conn->prepare($sqlCheckPotsCount);
+$stmtCheckPotsCount->bind_param("s", $names);
+$stmtCheckPotsCount->execute();
+$resultCheckPotsCount = $stmtCheckPotsCount->get_result();
+$rowCheckPotsCount = $resultCheckPotsCount->fetch_assoc();
+$userPotCount = $rowCheckPotsCount['pot_count'];
+$stmtCheckPotsCount->close();
+
+// Если горшков меньше 6, показываем кнопку добавления
+if ($userPotCount < 6) {
+    echo '<br><a href="?add_pot=yes" id="myBtn"><img src="https://cdn-icons-png.flaticon.com/512/1827/1827951.png" height="55" title="Добавить горшок (у вас ' . $userPotCount . ' из 6)"></a>';
+}
+// [MULTIPOT END]
 
 //** КОНЕЦ ФУНКЦИИ ПОЛИВА И УМЕНЬШЕНИЕ ПРОЦЕНТА  ***///
 //** ЦИКЛЫ РАСТЕНИЙ (независимо от логина)  ***///
@@ -1465,53 +1640,106 @@ echo "<style>.plant {
 
 
     
+// [MULTIPOT START] Обработчик посадки с выбором горшка
     if (isset($_POST['plant'.$tovarid])) {
 		    $planter = $names;
 		    $plantname = strip_tags($_POST['plantname']);
+		    $selectedPotId = isset($_POST['pot_id_'.$tovarid]) ? intval($_POST['pot_id_'.$tovarid]) : 0;
 		    $date = date("Y-m-d", time());
-		    
-		    
-   // Проверяем нет ли уже в горшочках места
-	$sql = "SELECT `id` FROM `oranjerie` WHERE `login`='$names'";
-	$res = mysqli_query($conn, $sql);
-	// Если введенные данные уже есть в таблице
-	if(mysqli_num_rows($res)) {
-	    $error = "Горшок уже занят другим растением. ";
-	   
+
+   // Проверяем, что выбран валидный горшок и он принадлежит пользователю
+	$sqlCheckPot = "SELECT `id` FROM `pots` WHERE `id` = ? AND `login` = ?";
+	$stmtCheckPot = $conn->prepare($sqlCheckPot);
+	$stmtCheckPot->bind_param("is", $selectedPotId, $names);
+	$stmtCheckPot->execute();
+	$resultCheckPot = $stmtCheckPot->get_result();
+
+	if($resultCheckPot->num_rows == 0) {
+	    $error = "Выбран неверный горшок.";
+	    $stmtCheckPot->close();
 	} else {
+	    $stmtCheckPot->close();
+
+	    // Проверяем, что горшок свободен
+	    $sqlCheckPlant = "SELECT `id` FROM `oranjerie` WHERE `login` = ? AND `pot_id` = ?";
+	    $stmtCheckPlant = $conn->prepare($sqlCheckPlant);
+	    $stmtCheckPlant->bind_param("si", $names, $selectedPotId);
+	    $stmtCheckPlant->execute();
+	    $resultCheckPlant = $stmtCheckPlant->get_result();
+
+	    if($resultCheckPlant->num_rows > 0) {
+	        $error = "Этот горшок уже занят другим растением.";
+	        $stmtCheckPlant->close();
+	    } else {
+	        $stmtCheckPlant->close();
 
 		   // обозначаем в депозитарии, что семечко посажено
 		   $depo = "UPDATE `depositarium` SET `used` = '1' WHERE id='$tovarid'";
 				mysqli_query($conn, $depo);
-		   
-		   // заносим данные в базу оранжереи
-			$sql = "INSERT INTO `oranjerie` SET `login`='$planter', `plant`='$plantname', `health`='$inithealth', `water`='60', `dateplanted`='$date', `waterhunger`='$date', `totalstages`='$stages', `stagenumber`='0', `plantstatus`='$initst', `resistance`='5'";
-			mysqli_query($conn, $sql);
+
+		   // заносим данные в базу оранжереи с pot_id
+			$sqlPlant = "INSERT INTO `oranjerie` SET `login`=?, `pot_id`=?, `plant`=?, `health`=?, `water`='60', `dateplanted`=?, `waterhunger`=?, `totalstages`=?, `stagenumber`='0', `plantstatus`=?, `resistance`='5'";
+			$stmtPlant = $conn->prepare($sqlPlant);
+			$stmtPlant->bind_param("sisssssi", $planter, $selectedPotId, $plantname, $inithealth, $date, $date, $stages, $initst);
+			$stmtPlant->execute();
+			$stmtPlant->close();
+
 			echo "<script language='javascript' type='text/javascript'>
     window.onLoad=poscrolim();
-    
+
     function poscrolim(){
         location.href='https://magismo.ru/greenhouse/';
     }
 </script>";
-   	}    
+   	    }
+   	}
 }
+// [MULTIPOT END]
+
+// [MULTIPOT START] Форма с выбором горшка
+   // Получаем все горшки пользователя
+   $sqlGetPots = "SELECT p.id, p.name,
+                  (SELECT COUNT(*) FROM `oranjerie` WHERE `pot_id` = p.id AND `login` = ?) as is_occupied
+                  FROM `pots` p
+                  WHERE p.`login` = ?
+                  ORDER BY p.id";
+   $stmtGetPots = $conn->prepare($sqlGetPots);
+   $stmtGetPots->bind_param("ss", $names, $names);
+   $stmtGetPots->execute();
+   $resultPots = $stmtGetPots->get_result();
+
+   $potOptions = "";
+   while($potData = $resultPots->fetch_assoc()) {
+       $potId = $potData['id'];
+       $potName = $potData['name'];
+       $isOccupied = $potData['is_occupied'] > 0;
+       $disabled = $isOccupied ? "disabled" : "";
+       $occupiedLabel = $isOccupied ? " (занят)" : " (свободен)";
+       $potOptions .= "<option value='$potId' $disabled>$potName$occupiedLabel</option>";
+   }
+   $stmtGetPots->close();
 
    echo "<span class='box-shadow'><center>
-   
-   <img src='$tovarp' height='58'> 
-   
+
+   <img src='$tovarp' height='58'>
+
    <br><b> $tovar </b>
-   
+
    <br>
    <form method='post'>
+   <select name='pot_id_$tovarid' required style='margin: 5px 0; padding: 5px;'>
+       <option value=''>Выберите горшок</option>
+       $potOptions
+   </select>
+   <br>
    <button name='plant$tovarid' class='button button5'  data-confirm='Вы уверены, что хотите посадить это семя?'>Посадить</button>
-   
+
    <input type='hidden' name='plantname' value='$tovar'>
    </form>
    </center>
    </span>
    &nbsp;";
+// [MULTIPOT END]
 
     
     }
@@ -1531,58 +1759,7 @@ echo "<p>У вас пока нет семян в депозитарии. Отп�
 
 
 
-<div class="room">
- 
-<div class="tooltip">
-<?
-// Проверяем нет ли уже в горшочках места
-	$sql = "SELECT * FROM `oranjerie` WHERE `login`='$names'";
-	$res = mysqli_query($conn, $sql);
-     $stagenum = "нет";
-     while($rows = mysqli_fetch_array($res)) {
-     
-     $plantname = $rows['plant'];
-     $health = $rows['health'];
-     $water = $rows['water'];
-     $cvetstat = $rows['plantstatus'];
-     $stagenum = $rows['stagenumber'];
-     
-     if($health < 0) { 
-        $healthperc = 0; 
-        
-    } else { 
-        $healthperc = $health;
-    }
-     }
-     
-     
-// Fetch the pot position
-$sql = "SELECT pot_left, pot_top FROM pot_positions WHERE username = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("s", $login);
-$stmt->execute();
-$result = $stmt->get_result();
-$userAgent = strtolower($_SERVER['HTTP_USER_AGENT']);
-$isMobile = strpos($userAgent, 'mobile');
-
-if ($row = $result->fetch_assoc()) {
-    $potLeft = $row['pot_left'];
-    $potTop = $row['pot_top'];
-
-    // Adjust if a mobile device is detected and the saved positions are out of view
-    if ($isMobile !== false) {
-        // Example adjustment, you might need to fine-tune these
-        $potLeft = '10%'; // Adjust for mobile
-        $potTop = '50%'; // Adjust for mobile
-    }
-} else {
-    // Default position if not set
-    $potLeft = '50%';
-    $potTop = '80%';
-}    
-     
-  ?>  
-
+<!-- [MULTIPOT START] Рендер нескольких горшков -->
 <style>
 .tooltip {
   position: relative;
@@ -1598,8 +1775,6 @@ if ($row = $result->fetch_assoc()) {
   text-align: center;
   border-radius: 6px;
   padding: 5px 0;
-
-  /* Position the tooltip */
   position: absolute;
   z-index: 1;
 }
@@ -1607,96 +1782,117 @@ if ($row = $result->fetch_assoc()) {
 .tooltip:hover .tooltiptext {
   visibility: visible;
 }
- .pot {
- width: 18%;
- }
+
+.pot {
+  width: 18%;
+  position: absolute;
+  cursor: grab;
+}
 </style>
 
-<div class="tooltip">
-    <div class="pot"> 
-    <?
-    // Проверяем нет ли уже в горшочках места
-	$sql = "SELECT `id` FROM `oranjerie` WHERE `login`='$names'";
-	$res = mysqli_query($conn, $sql);
-	// Если введенные данные уже есть в таблице
-	if(mysqli_num_rows($res)) {
-	 ?>  
-	
-  <!--  <div class="plantname"><?//$plantname?><br></div> -->
-    
-    
-     <div class="plant"> </div>
-     
-    <? if($cvetstat == 3) {
+<div class="room">
+<?php
+// Получаем все горшки пользователя
+$sqlGetAllPots = "SELECT * FROM `pots` WHERE `login` = ? ORDER BY `id`";
+$stmtGetAllPots = $conn->prepare($sqlGetAllPots);
+$stmtGetAllPots->bind_param("s", $names);
+$stmtGetAllPots->execute();
+$resultAllPots = $stmtGetAllPots->get_result();
 
-	     echo "  <div class='infestedplant'> </div>";
+// Рендерим каждый горшок в цикле
+while ($potRow = $resultAllPots->fetch_assoc()) {
+    $potId = $potRow['id'];
+    $potName = $potRow['name'];
+    $potLeft = $potRow['pot_left'];
+    $potTop = $potRow['pot_top'];
+
+    // Проверяем, есть ли растение в этом горшке
+    $sqlGetPlant = "SELECT * FROM `oranjerie` WHERE `login` = ? AND `pot_id` = ?";
+    $stmtGetPlant = $conn->prepare($sqlGetPlant);
+    $stmtGetPlant->bind_param("si", $names, $potId);
+    $stmtGetPlant->execute();
+    $resultPlant = $stmtGetPlant->get_result();
+    $plantRow = $resultPlant->fetch_assoc();
+
+    // Мобильная подстройка
+    $userAgent = strtolower($_SERVER['HTTP_USER_AGENT']);
+    $isMobile = strpos($userAgent, 'mobile');
+    if ($isMobile !== false && $potId == 1) {
+        $potLeft = '10%';
+        $potTop = '50%';
     }
-     ?>
-   <span class="tooltiptext"><span style='color:#4bb14f;text-transform: uppercase;'><?=$plantname?></span>
-    <br>Стадия роста: <?=$stagenum?>
-    
-     <?php
-// Цветок болен
-	 if($cvetstat == 3) {
 
-	     //echo "  <div class='infestedplant'> </div>";
-	     
-	     echo "<div class='sick nostripes hvr-pulse-grow'>
-	 <span style='width: ".$healthperc."%' class=''></span>
-	 <font style='font-size:11pt'>Здоровье ".$healthperc."%</font> <img src='https://cdn-icons-png.flaticon.com/512/333/333661.png' height='15' title='Растение страдает от инфестации паразитами'>
-	 </div>";
-	 
-	 } 
-	 
-	 elseif($cvetstat == 2) {
-
-	  
-	     
-	     echo "<div class='rotten nostripes hvr-pulse-grow'>
-	 <span style='width: ".$healthperc."%' class=''></span>
-	 <font style='font-size:11pt'>Здоровье ".$healthperc."%</font> <img src='https://cdn-icons-png.flaticon.com/512/983/983061.png' height='15' title='Растение погибло'>
-	 </div>";
-	 
-	 } 
-	 // Цветок здоров
-	 else {
-	  echo "<div class='health nostripes hvr-pulse-grow'>
-	 <span style='width: ".$healthperc."%'></span>
-	 <font style='font-size:11pt'>Здоровье ".$healthperc."%</font> <img src='https://cdn-icons-png.flaticon.com/512/1971/1971038.png' height='15' title='Растение здоровое'>
-	 </div>";
-	 }
-	 ?>
-
-    
-    
-    <?php
-    if($water < 0) { 
-        $waterperc = 0; 
-        
-    } else { 
-        $waterperc = $water;
-    }
     ?>
-    
-    <div class="water nostripes hvr-pulse-grow">
-	<span style="width: <?=$waterperc?>%"></span>
-	 <font style='font-size:11pt'>Полив <?=$waterperc?>%</font> <img src='https://cdn-icons-png.flaticon.com/512/2114/2114534.png' height='15'>
+
+    <div class="tooltip">
+        <div class="pot" data-pot-id="<?=$potId?>" style="left: <?=$potLeft?>; top: <?=$potTop?>;">
+
+        <?php if ($plantRow) {
+            // Есть растение в горшке
+            $plantname = $plantRow['plant'];
+            $health = $plantRow['health'];
+            $water = $plantRow['water'];
+            $cvetstat = $plantRow['plantstatus'];
+            $stagenum = $plantRow['stagenumber'];
+            $healthperc = ($health < 0) ? 0 : $health;
+            $waterperc = ($water < 0) ? 0 : $water;
+        ?>
+
+            <div class="plant"></div>
+
+            <?php if($cvetstat == 3) { ?>
+                <div class='infestedplant'></div>
+            <?php } ?>
+
+            <span class="tooltiptext">
+                <span style='color:#4bb14f;text-transform: uppercase;'><?=$plantname?></span>
+                <br>Стадия роста: <?=$stagenum?>
+
+                <?php if($cvetstat == 3) { ?>
+                    <div class='sick nostripes hvr-pulse-grow'>
+                        <span style='width: <?=$healthperc?>%'></span>
+                        <font style='font-size:11pt'>Здоровье <?=$healthperc?>%</font>
+                        <img src='https://cdn-icons-png.flaticon.com/512/333/333661.png' height='15' title='Растение страдает от инфестации паразитами'>
+                    </div>
+                <?php } elseif($cvetstat == 2) { ?>
+                    <div class='rotten nostripes hvr-pulse-grow'>
+                        <span style='width: <?=$healthperc?>%'></span>
+                        <font style='font-size:11pt'>Здоровье <?=$healthperc?>%</font>
+                        <img src='https://cdn-icons-png.flaticon.com/512/983/983061.png' height='15' title='Растение погибло'>
+                    </div>
+                <?php } else { ?>
+                    <div class='health nostripes hvr-pulse-grow'>
+                        <span style='width: <?=$healthperc?>%'></span>
+                        <font style='font-size:11pt'>Здоровье <?=$healthperc?>%</font>
+                        <img src='https://cdn-icons-png.flaticon.com/512/1971/1971038.png' height='15' title='Растение здоровое'>
+                    </div>
+                <?php } ?>
+
+                <div class="water nostripes hvr-pulse-grow">
+                    <span style="width: <?=$waterperc?>%"></span>
+                    <font style='font-size:11pt'>Полив <?=$waterperc?>%</font>
+                    <img src='https://cdn-icons-png.flaticon.com/512/2114/2114534.png' height='15'>
+                </div>
+            </span>
+
+        <?php } else { ?>
+            <!-- Горшок пустой -->
+            <span class="tooltiptext">
+                <span style='color:#aaa;'>Горшок пуст</span>
+                <br>Посадите семя из депозитария
+            </span>
+        <?php } ?>
+
+        </div>
     </div>
+
     <?php
-	} else {
-	}
-	    ?>
-    </span> 
-   </div>
-    
-    
-</div>   
-   
+    $stmtGetPlant->close();
+}
+$stmtGetAllPots->close();
+?>
 </div>
-</div>
-
-
-</div>
+<!-- [MULTIPOT END] -->
 
  
 
@@ -1709,78 +1905,77 @@ if ($row = $result->fetch_assoc()) {
 }
 ?>
 
+<!-- [MULTIPOT START] JavaScript для drag-and-drop нескольких горшков -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const pot = document.querySelector('.pot');
+    const pots = document.querySelectorAll('.pot');
 
-    pot.style.left = '<?= $potLeft ?>'; // Set initial left position
-    pot.style.top = '<?= $potTop ?>'; // Set initial top position
+    pots.forEach(function(pot) {
+        let offsetX = 0, offsetY = 0, drag = false;
+        let currentPot = null;
 
-    let offsetX = 0, offsetY = 0, drag = false;
-    
- function startDrag(e) {
-        drag = true;
-        const rect = pot.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        offsetX = clientX - rect.left;
-        offsetY = clientY - rect.top;
+        function startDrag(e) {
+            drag = true;
+            currentPot = pot;
+            const rect = pot.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            offsetX = clientX - rect.left;
+            offsetY = clientY - rect.top;
 
-        // Convert offsets to percentages of the viewport to maintain consistency
-        offsetX = (offsetX / window.innerWidth) * 100;
-        offsetY = (offsetY / window.innerHeight) * 100;
+            // Convert offsets to percentages of the viewport to maintain consistency
+            offsetX = (offsetX / window.innerWidth) * 100;
+            offsetY = (offsetY / window.innerHeight) * 100;
 
-        pot.style.cursor = 'grabbing';
-    }
+            pot.style.cursor = 'grabbing';
+        }
 
-   function doDrag(e) {
-        if (!drag) return;
-        e.preventDefault();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        function doDrag(e) {
+            if (!drag || currentPot !== pot) return;
+            e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        // Convert the dragged position to percentages of the viewport
-        const leftPercent = ((clientX - offsetX) / window.innerWidth) * 100;
-        const topPercent = ((clientY - offsetY) / window.innerHeight) * 100;
+            // Convert the dragged position to percentages of the viewport
+            const leftPercent = ((clientX - offsetX) / window.innerWidth) * 100;
+            const topPercent = ((clientY - offsetY) / window.innerHeight) * 100;
 
-        // Apply the new position in percentages
-        pot.style.left = `${leftPercent}%`;
-        pot.style.top = `${topPercent}%`;
-    }
+            // Apply the new position in percentages
+            pot.style.left = `${leftPercent}%`;
+            pot.style.top = `${topPercent}%`;
+        }
 
+        function endDrag() {
+            if (!drag || currentPot !== pot) return;
+            drag = false;
+            pot.style.cursor = 'grab';
+            // Position is already in percentages, so you can save it directly
+            const potId = pot.getAttribute('data-pot-id');
+            savePotPosition(potId, pot.style.left, pot.style.top);
+            currentPot = null;
+        }
 
-    function endDrag() {
-        drag = false;
-        pot.style.cursor = 'grab';
-        // Position is already in percentages, so you can save it directly
-        savePotPosition(pot.style.left, pot.style.top);
-    }
+        pot.addEventListener('mousedown', startDrag);
+        pot.addEventListener('touchstart', startDrag);
 
-    pot.addEventListener('mousedown', startDrag);
-    pot.addEventListener('touchstart', startDrag);
+        document.addEventListener('mousemove', doDrag);
+        document.addEventListener('touchmove', doDrag);
 
-    document.addEventListener('mousemove', doDrag);
-    document.addEventListener('touchmove', doDrag);
-
-    document.addEventListener('mouseup', endDrag);
-    document.addEventListener('touchend', endDrag);
-    document.addEventListener('touchcancel', endDrag);
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+        document.addEventListener('touchcancel', endDrag);
+    });
 });
 
-
-
-
-
-function savePotPosition(left, top) {
-    const username = "<?= htmlspecialchars($login, ENT_QUOTES, 'UTF-8') ?>"; 
+function savePotPosition(potId, left, top) {
+    const username = "<?= htmlspecialchars($names, ENT_QUOTES, 'UTF-8') ?>";
 
     fetch('save_pot_position.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        // Now using the sanitized PHP variable
-        body: `left=${left}&top=${top}&username=${username}`
+        body: `pot_id=${potId}&left=${left}&top=${top}&username=${username}`
     })
     .then(response => response.text())
     .then(data => {
@@ -1791,6 +1986,7 @@ function savePotPosition(left, top) {
     });
 }
 </script>
+<!-- [MULTIPOT END] -->
 
 <script>
 // Get the modal
